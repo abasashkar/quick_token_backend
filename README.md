@@ -1,39 +1,33 @@
-# Quick Token App (Flutter)
+# Quick Token Backend (Node.js + Express + MongoDB)
 
-Quick Token is a **Flutter-based mobile application** designed for managing patient accounts, appointments, and tokens efficiently.  
-It allows users to **create accounts**, **book appointments**, and **track their tokens** in a smooth and user-friendly interface.
+This is the **backend server** for the Quick Token Flutter app, built with **Node.js**, **Express**, and **MongoDB**.  
+It provides APIs for managing **patients, appointments, and tokens** efficiently.
 
 ---
 
 ## Features
 
-- **User Authentication**
-  - Sign up / Sign in functionality
-  - Secure user login
+- **Patient Management**
+  - Create and manage patient accounts
+  - Store patient details securely
 
-- **Patient Account Management**
-  - Create and manage patient profiles
-  - Edit personal information
+- **Token / Appointment Management**
+  - Issue tokens for appointments
+  - Track token status
+  - View patient appointments
 
-- **Appointments**
-  - Book appointments with doctors
-  - View upcoming and past appointments
+- **Product Management (Optional)**
+  - Add and fetch products (if used in app)
+  - Filter products by name, category, gender, and price
 
-- **Token Management**
-  - Track tokens issued for appointments
-  - Receive notifications and updates
+- **Static File Serving**
+  - Serves files from `/uploads` (for images or documents)
 
-- **State Management**
-  - Uses **GetX** for reactive and efficient state management
+- **CORS Enabled**
+  - Allows requests from any origin
 
-- **Responsive UI**
-  - Designed for both Android and iOS devices
-
----
-
-## Screenshots
-
-*(Add screenshots of your app screens here to make README visually appealing)*
+- **Server Health Check**
+  - GET `/` returns `"Backend running successfully!"`
 
 ---
 
@@ -41,19 +35,11 @@ It allows users to **create accounts**, **book appointments**, and **track their
 
 ### Prerequisites
 
-- Flutter SDK (>=3.0)  
-- Dart SDK  
-- Android Studio / Xcode  
+- Node.js (>=14)  
+- npm or yarn  
+- MongoDB database  
+- `.env` file with:
 
-### Steps
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/quick-token-app.git
-cd quick-token-app
-
-# 2. Install dependencies
-flutter pub get
-
-# 3. Run the app
-flutter run
+```env
+MONGO_URI=your_mongodb_connection_string
+PORT=5000
