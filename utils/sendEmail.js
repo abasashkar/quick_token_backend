@@ -1,32 +1,3 @@
-// const nodemailer = require("nodemailer");
-
-// const sendEmail = async (email, subject, text) => {
-//   try {
-//     const transporter = nodemailer.createTransport({
-//       service: "gmail",
-//       auth: {
-//         user: process.env.EMAIL_USER,
-//         pass: process.env.EMAIL_PASS,
-//       },
-//     });
-
-//     await transporter.sendMail({
-//       from: process.env.EMAIL_USER,
-//       to: email,
-//       subject: subject,
-//       text: text,
-//     });
-
-//     console.log("Email sent successfully");
-//   } catch (error) {
-//     console.log("Email not sent");
-//     console.error(error);
-//   }
-// };
-
-// module.exports = sendEmail;
-
-// utils/sendEmail.js
 const nodemailer = require("nodemailer");
 
 const sendEmail = async (email, subject, text) => {
@@ -42,13 +13,14 @@ const sendEmail = async (email, subject, text) => {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: subject,
-      text: text,
+      subject,
+      text,
     });
 
     console.log("Email sent successfully to", email);
   } catch (error) {
-    console.log("Email not sent", error);
+    console.error("Email not sent", error);
+    throw new Error("Email could not be sent");
   }
 };
 

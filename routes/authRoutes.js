@@ -1,27 +1,35 @@
-// routes/authRoutes.js
-const express = require("express");
+const express = require('express');
 const router = express.Router();
+const controller = require('../controllers/appointmentController');
+const auth = require('../middleware/verifytoken');
+const Appointment = require('../models/appointmentmodels'); // ✅ FIX
 
-const {
-  registerUser,
-  loginUser,
-  getUsername,
-  sendOtp,
-  verifyOtp,
-} = require("../controllers/authcontroller"); // ✅ Make sure file name matches exactly (case-sensitive)
+router.get('/slots', controller.getAvailableSlots);
+router.post('/book', auth, controller.bookAppointment);
 
-const verifyToken = require("../middleware/verifytoken"); // ✅ Ensure correct file name
+router.get('/doctor/today', auth, controller.getDoctorTodayAppointments);
 
-// 🟢 Public routes (accessible without authentication)
-router.post("/register", registerUser);    // Manual registration with role
-router.post("/login", loginUser);          // Password-based login
-router.post("/send-otp", sendOtp);         // Gmail OTP request
-router.post("/verify-otp", verifyOtp);     // Gmail OTP verification
+router.get('/my', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'patient') {
+      return res.status(403).json({ message: 'Only patients allowed' });
+    }
 
-// 🔒 Protected route (requires valid token)
-router.get("/getUsername", verifyToken, getUsername);
+    const appointments = await Appointment.find({
+      patientId: req.user.id,
+    }).populate('doctorId');
 
-// ✅ Optional: You can add logout or refresh-token later
-// router.post("/logout", logoutUser);
+    res.status(200).json({
+      success: true,
+      appointments,
+    });
+  } catch (err) {
+    console.error('MY appointments error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+});
 
 module.exports = router;
