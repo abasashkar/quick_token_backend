@@ -26,7 +26,7 @@ exports.registerUser = async (req, res, next) => {
     const user = await User.create({ name, email, role });
 
     if (role === "doctor") {
-      await Doctor.create({ userId: user._id, name, location: "", ratings: 0, reviews: "", imageUrl: "" });
+      await Doctor.create({ userId: user._id, name, location: "", ratings: 0, reviews: "", imageUrl: ""});
     }
 
     res.status(201).json(new ApiResponse(201, { name, email, role }, "Registered successfully"));

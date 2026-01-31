@@ -77,11 +77,11 @@ exports.getAvailableSlots = async (req, res) => {
     console.log('All generated slots:', allSlots);
 
     // 6️⃣ Booked slots
-    const bookedSlots = await Appointment.find({
-      doctorId: doctor._id,
-      date,
-      status: 'CONFIRMED',
-    }).distinct('slot');
+const bookedSlots = await Appointment.find({
+  doctorId: doctor._id,
+  date,
+  status: { $in: ['PENDING', 'CONFIRMED'] },
+}).distinct('slot');
 
     console.log('Booked slots:', bookedSlots);
 
@@ -146,14 +146,16 @@ exports.bookAppointment = async (req, res) => {
         status: 'CONFIRMED',
       })) + 1;
 
-    const appointment = await Appointment.create({
-      doctorId: doctor._id,
-      patientId: req.user.id,
-      date,
-      slot,
-      tokenNumber,
-      status: 'CONFIRMED',
-    });
+const appointment = await Appointment.create({
+  doctorId: doctor._id,
+  patientId: req.user.id,
+  date,
+  slot,
+  status: 'PENDING',     // 👈 KEY FIX
+  tokenNumber: null,     // 👈 token only after doctor accepts
+
+});
+console.log('Appointment status', appointment.status);
 
     return res.status(201).json({
       success: true,
@@ -166,48 +168,113 @@ exports.bookAppointment = async (req, res) => {
     });
   }
 };
+exports.getDoctorPendingAppointments = async (req, res) => {
+  if (req.user.role !== 'doctor') {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  const doctor = await Doctor.findOne({ userId: req.user.id });
+  if (!doctor) {
+    return res.status(404).json({ message: 'Doctor not found' });
+  }
+
+  const appointments = await Appointment.find({
+    doctorId: doctor._id,
+    status: 'PENDING',
+  })
+    .populate('patientId', 'name')
+    .sort({ createdAt: 1 });
+
+  res.json({ success: true, appointments });
+};
+
+exports.acceptAppointment = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // 🔑 Find doctor from logged-in user
+    const doctor = await Doctor.findOne({ userId: req.user.id });
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    // 🔐 Fetch appointment AND verify ownership
+    const appointment = await Appointment.findOne({
+      _id: appointmentId,
+      doctorId: doctor._id,
+    });
+
+    if (!appointment || appointment.status !== 'PENDING') {
+      return res.status(400).json({ message: 'Invalid appointment' });
+    }
+
+    const tokenNumber =
+      (await Appointment.countDocuments({
+        doctorId: doctor._id,
+        date: appointment.date,
+        status: 'CONFIRMED',
+      })) + 1;
+
+    appointment.status = 'CONFIRMED';
+    appointment.tokenNumber = tokenNumber;
+    await appointment.save();
+
+    return res.json({
+      success: true,
+      appointment,
+    });
+  } catch (err) {
+    console.error('acceptAppointment error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.rejectAppointment = async (req, res) => {
+  const { appointmentId } = req.params;
+
+  if (req.user.role !== 'doctor') {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  const appointment = await Appointment.findById(appointmentId);
+  if (!appointment) {
+    return res.status(404).json({ message: 'Appointment not found' });
+  }
+
+  appointment.status = 'CANCELLED';
+  await appointment.save();
+
+  res.json({ success: true, appointment });
+};
 
 /**
  * ================================
  * DOCTOR TODAY APPOINTMENTS
  * ================================
  */
-exports.getDoctorTodayAppointments = async (req, res) => {
-  try {
-    if (req.user.role !== 'doctor') {
-      return res.status(403).json({
-        message: 'Access denied',
-      });
-    }
-
-    // 🔑 Map logged-in user → Doctor profile
-    const doctor = await Doctor.findOne({ userId: req.user.id });
-
-    if (!doctor) {
-      return res.status(404).json({
-        message: 'Doctor profile not found',
-      });
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-
-    const appointments = await Appointment.find({
-      doctorId: doctor._id,
-      date: today,
-      status: 'CONFIRMED',
-    }).sort({ slot: 1 });
-
-    return res.status(200).json({
-      success: true,
-      date: today,
-      appointments,
-    });
-  } catch (err) {
-    console.error('getDoctorTodayAppointments error:', err);
-    return res.status(500).json({
-      message: 'Server error',
-    });
+exports.getDoctorConfirmedAppointments = async (req, res) => {
+  if (req.user.role !== 'doctor') {
+    return res.status(403).json({ message: 'Access denied' });
   }
+
+  const doctor = await Doctor.findOne({ userId: req.user.id });
+  if (!doctor) {
+    return res.status(404).json({ message: 'Doctor not found' });
+  }
+
+  const appointments = await Appointment.find({
+    doctorId: doctor._id,
+    status: 'CONFIRMED',
+  }).sort({ date: 1, slot: 1 });
+
+  res.json({
+    success: true,
+    appointments,
+  });
 };
 
 exports.updateAppointmentStatus = async (req, res) => {
@@ -215,12 +282,11 @@ exports.updateAppointmentStatus = async (req, res) => {
     const { appointmentId } = req.params;
     const { status } = req.body;
 
-    const allowedStatuses = [
-      'CONFIRMED',
-      'CANCELLED',
-      'COMPLETED',
-      'NO_SHOW',
-    ];
+ const allowedStatuses = [
+  'CANCELLED',
+  'COMPLETED',
+  'NO_SHOW',
+];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({

@@ -3,6 +3,7 @@ const router = express.Router();
 const Doctor = require("../models/doctorsmodel");
 const DoctorAvailability = require("../models/doctorAvailablity");
 const verifyToken = require("../middleware/verifytoken");
+const { updateDoctorProfile } = require("../controllers/doctorsController");
 
 // 🔹 Logged-in doctor profile
 
@@ -13,6 +14,9 @@ router.get("/", async (req, res) => {
   const doctors = await Doctor.find();
   res.status(200).json({ doctors });
 });
+
+
+router.put("/profile", verifyToken, updateDoctorProfile);
 
 // 🔹 SET DOCTOR AVAILABILITY ✅ (THIS WAS MISSING)
 router.post("/availability", verifyToken, async (req, res) => {
@@ -42,6 +46,7 @@ router.post("/availability", verifyToken, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
 
 
 module.exports = router;

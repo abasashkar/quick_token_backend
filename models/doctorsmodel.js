@@ -1,5 +1,4 @@
 
-
 const mongoose = require("mongoose");
 
 const doctorSchema = new mongoose.Schema(
@@ -11,10 +10,13 @@ const doctorSchema = new mongoose.Schema(
       unique: true
     },
     name: { type: String, required: true },
+    email: { type: String, default: "" },
     location: { type: String, default: "" },
     ratings: { type: Number, default: 0 },
     reviews: { type: String, default: "" },
-    imageUrl: { type: String, default: "" }
+    imageUrl: { type: String, default: "" },
+    specialization:{type: String, default: ""},
+
   },
   { timestamps: true }
 );
