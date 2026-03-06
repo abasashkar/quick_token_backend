@@ -70,12 +70,15 @@ exports.verifyOtp = async (req, res, next) => {
     if (!otpRecord || otpRecord.expiresAt < new Date()) throw new ApiError(400, "Invalid or expired OTP");
 
     const user = await User.findOne({ email });
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email, name: user.name },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+const token = jwt.sign(
+  {
+    id: user._id,
+    role: user.role,
+    email: user.email
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: "7d" }
+);
 
     await Otp.deleteMany({ email });
 
@@ -86,3 +89,26 @@ exports.verifyOtp = async (req, res, next) => {
 };
 
 
+exports.saveFcmToken = async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+
+    console.log("BODY:", req.body); // 👈 debug
+    console.log("USER:", req.user.email);
+
+    if (!fcmToken) {
+      return res.status(400).json({ message: "FCM token is required" });
+    }
+
+    req.user.fcmToken = fcmToken;
+    await req.user.save();
+
+    return res.json({
+      success: true,
+      message: "FCM token saved",
+    });
+  } catch (err) {
+    console.error("saveFcmToken error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

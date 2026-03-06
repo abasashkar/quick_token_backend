@@ -2,6 +2,10 @@ const Appointment = require('../models/appointmentmodels');
 const DoctorAvailability = require('../models/doctorAvailablity');
 const generateSlots = require('../utils/slotGenerator');
 const Doctor = require('../models/doctorsmodel');
+const sendNotification = require("../utils/sendNotification");
+const User = require("../models/usermodels");
+const mongoose = require('mongoose');
+
 
 /**
  * ================================
@@ -110,6 +114,8 @@ const bookedSlots = await Appointment.find({
  * BOOK APPOINTMENT (PATIENT)
  * ================================
  */
+
+
 exports.bookAppointment = async (req, res) => {
   try {
     console.log('=== Book Appointment Request ===');
@@ -122,40 +128,86 @@ exports.bookAppointment = async (req, res) => {
       });
     }
 
+    // ✅ DEFINE FIRST
     const { doctorId, date, slot } = req.body;
 
+    // ✅ NOW you can validate
     if (!doctorId || !date || !slot) {
       return res.status(400).json({
         message: 'doctorId, date and slot are required',
       });
     }
 
-    // ✅ doctorId = Doctor._id
+    // ✅ ObjectId validation (CORRECT PLACE)
+    if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+      return res.status(400).json({
+        message: 'Invalid doctorId format',
+      });
+    }
+
+    console.log('Incoming doctorId:', doctorId);
+
+    // ✅ Find doctor
     const doctor = await Doctor.findById(doctorId);
+
     if (!doctor) {
       return res.status(404).json({
         message: 'Doctor not found',
       });
     }
 
-    // 🔢 Token number
-    const tokenNumber =
-      (await Appointment.countDocuments({
-        doctorId: doctor._id,
-        date,
-        status: 'CONFIRMED',
-      })) + 1;
+    // 🔍 Debug mapping
+    console.log('Resolved Doctor _id:', doctor._id.toString());
+    console.log('Doctor.userId:', doctor.userId.toString());
 
-const appointment = await Appointment.create({
-  doctorId: doctor._id,
-  patientId: req.user.id,
-  date,
-  slot,
-  status: 'PENDING',     // 👈 KEY FIX
-  tokenNumber: null,     // 👈 token only after doctor accepts
+    // ✅ Slot check
+    const slotAlreadyBooked = await Appointment.findOne({
+      doctorId: doctor._id,
+      date,
+      slot,
+      status: { $in: ['PENDING', 'CONFIRMED'] },
+    });
 
-});
-console.log('Appointment status', appointment.status);
+    if (slotAlreadyBooked) {
+      return res.status(409).json({
+        message: 'Slot already booked',
+      });
+    }
+
+    // ✅ Create appointment
+    const appointment = await Appointment.create({
+      doctorId: doctor._id,
+      patientId: req.user._id,
+      date,
+      slot,
+      status: 'PENDING',
+      tokenNumber: null,
+    });
+
+    // ✅ Notify doctor
+// ✅ Notify doctor (NON-BLOCKING)
+const doctorUser = await User.findById(doctor.userId);
+
+try {
+  if (doctorUser?.fcmToken) {
+    await sendNotification({
+      token: doctorUser.fcmToken,
+      title: 'New Appointment Request 🩺',
+      body: `New appointment on ${date} at ${slot}`,
+      data: {
+        appointmentId: appointment._id.toString(),
+        type: 'NEW_APPOINTMENT',
+      },
+    });
+  }
+} catch (err) {
+  console.warn(
+    '⚠️ FCM failed but booking succeeded:',
+    err.message
+  );
+}
+
+    console.log('Appointment status:', appointment.status);
 
     return res.status(201).json({
       success: true,
@@ -168,12 +220,14 @@ console.log('Appointment status', appointment.status);
     });
   }
 };
+
 exports.getDoctorPendingAppointments = async (req, res) => {
   if (req.user.role !== 'doctor') {
     return res.status(403).json({ message: 'Access denied' });
   }
 
-  const doctor = await Doctor.findOne({ userId: req.user.id });
+  const doctor = await Doctor.findOne({ userId: req.user._id
+ });
   if (!doctor) {
     return res.status(404).json({ message: 'Doctor not found' });
   }
@@ -197,7 +251,8 @@ exports.acceptAppointment = async (req, res) => {
     }
 
     // 🔑 Find doctor from logged-in user
-    const doctor = await Doctor.findOne({ userId: req.user.id });
+    const doctor = await Doctor.findOne({ userId: req.user._id
+ });
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor not found' });
     }
@@ -222,6 +277,23 @@ exports.acceptAppointment = async (req, res) => {
     appointment.status = 'CONFIRMED';
     appointment.tokenNumber = tokenNumber;
     await appointment.save();
+    // 🔔 Notify patient: appointment confirmed
+const patientUser = await User.findById(appointment.patientId);
+
+if (patientUser?.fcmToken) {
+  await sendNotification({
+    token: patientUser.fcmToken,
+    title: "Appointment Confirmed ✅",
+    body: `Your appointment on ${appointment.date} at ${appointment.slot} is confirmed`,
+    data: {
+      appointmentId: appointment._id.toString(),
+      type: "APPOINTMENT_CONFIRMED",
+    },
+  });
+}
+
+
+
 
     return res.json({
       success: true,
@@ -239,14 +311,39 @@ exports.rejectAppointment = async (req, res) => {
   if (req.user.role !== 'doctor') {
     return res.status(403).json({ message: 'Access denied' });
   }
+const doctor = await Doctor.findOne({ userId: req.user._id });
+if (!doctor) {
+  return res.status(404).json({ message: 'Doctor not found' });
+}
 
-  const appointment = await Appointment.findById(appointmentId);
-  if (!appointment) {
-    return res.status(404).json({ message: 'Appointment not found' });
-  }
+const appointment = await Appointment.findOne({
+  _id: appointmentId,
+  doctorId: doctor._id
+});
+
+if (!appointment) {
+  return res.status(404).json({ message: 'Appointment not found' });
+}
+
 
   appointment.status = 'CANCELLED';
   await appointment.save();
+
+  // 🔔 Notify patient: appointment rejected
+const patientUser = await User.findById(appointment.patientId);
+
+if (patientUser?.fcmToken) {
+  await sendNotification({
+    token: patientUser.fcmToken,
+    title: "Appointment Rejected ❌",
+    body: "Doctor is unavailable for the selected slot",
+    data: {
+      appointmentId: appointment._id.toString(),
+      type: "APPOINTMENT_REJECTED",
+    },
+  });
+}
+
 
   res.json({ success: true, appointment });
 };
@@ -261,7 +358,8 @@ exports.getDoctorConfirmedAppointments = async (req, res) => {
     return res.status(403).json({ message: 'Access denied' });
   }
 
-  const doctor = await Doctor.findOne({ userId: req.user.id });
+  const doctor = await Doctor.findOne({ userId: req.user._id
+ });
   if (!doctor) {
     return res.status(404).json({ message: 'Doctor not found' });
   }
@@ -276,6 +374,7 @@ exports.getDoctorConfirmedAppointments = async (req, res) => {
     appointments,
   });
 };
+
 
 exports.updateAppointmentStatus = async (req, res) => {
   try {
@@ -294,7 +393,14 @@ exports.updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findById(appointmentId);
+const doctor = await Doctor.findOne({ userId: req.user._id
+ });
+
+const appointment = await Appointment.findOne({
+  _id: appointmentId,
+  doctorId: doctor._id,
+});
+
 
     if (!appointment) {
       return res.status(404).json({
@@ -316,7 +422,7 @@ exports.updateAppointmentStatus = async (req, res) => {
       // Patient can cancel only their own appointment
       if (
         req.user.role === 'patient' &&
-        appointment.patientId.toString() !== req.user.id
+        appointment.patientId.toString() !== req.user._id
       ) {
         return res.status(403).json({
           message: 'Not allowed to cancel this appointment',

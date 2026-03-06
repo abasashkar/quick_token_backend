@@ -23,6 +23,9 @@ app.use("/api/doctors", doctorRoutes);
 const appointmentroutes = require("./routes/appointmentRoutes");
 app.use("/api/appointments", appointmentroutes);
 
+const chatroutes = require("./routes/chatRoutes");
+app.use("/api/chats", chatroutes);
+
 
 
 

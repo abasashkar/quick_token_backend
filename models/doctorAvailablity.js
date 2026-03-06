@@ -18,6 +18,9 @@ const doctorAvailabilitySchema = new mongoose.Schema({
   },
   breakStart: String, // "13:00"
   breakEnd: String,   // "14:00"
-});
+
+  
+},
+  { timestamps: true });
 
 module.exports = mongoose.model('DoctorAvailability', doctorAvailabilitySchema);

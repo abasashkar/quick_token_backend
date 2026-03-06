@@ -7,15 +7,21 @@
   },
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "This is the **backend server** for the Quick Token Flutter app, built with **Node.js**, **Express**, and **MongoDB**.   It provides APIs for managing **patients, appointments, and tokens** efficiently.",
   "dependencies": {
+    "axios": "^1.13.4",
     "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0",
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "firebase-admin": "^13.6.1",
     "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.21.0",
     "mongoose": "^8.14.3",
     "nodemailer": "^7.0.10",
-    "nodemon": "^3.1.10"
-  }
+    "nodemon": "^3.1.10",
+    "openai": "^6.18.0"
+  },
+  "keywords": []
 }

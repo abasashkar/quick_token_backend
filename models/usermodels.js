@@ -1,14 +1,13 @@
-
-
-
-
-
-
 // models/User.js
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
+
   {
+      fcmToken:{
+        type:String,
+        default:null
+    },
     name: {
       type: String,
       required: true
